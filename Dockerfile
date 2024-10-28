@@ -1,11 +1,12 @@
-FROM alpine
-MAINTAINER David Personette <dperson@gmail.com>
+FROM d.net-works.top/library/debian:bullseye
 
-# Install samba
-RUN apk --no-cache --no-progress upgrade && \
-    apk --no-cache --no-progress add bash samba shadow tini tzdata && \
-    addgroup -S smb && \
-    adduser -S -D -H -h /tmp -s /sbin/nologin -G smb -g 'Samba User' smbuser &&\
+# Install samba and dependencies
+RUN apt-get update && \
+    apt-get upgrade -y && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+    bash samba smbclient tini tzdata libattr1-dev samba-vfs-modules && \
+    groupadd -r smb && \
+    useradd -r -M -d /tmp -s /usr/sbin/nologin -g smb -c 'Samba User' smbuser && \
     file="/etc/samba/smb.conf" && \
     sed -i 's|^;* *\(log file = \).*|   \1/dev/stdout|' $file && \
     sed -i 's|^;* *\(load printers = \).*|   \1no|' $file && \
@@ -53,7 +54,7 @@ RUN apk --no-cache --no-progress upgrade && \
     echo '   fruit:veto_appledouble = no' >>$file && \
     echo '   fruit:wipe_intentionally_left_blank_rfork = yes' >>$file && \
     echo '' >>$file && \
-    rm -rf /tmp/*
+    rm -rf /var/lib/apt/lists/* /tmp/*
 
 COPY samba.sh /usr/bin/
 
@@ -63,6 +64,6 @@ HEALTHCHECK --interval=60s --timeout=15s \
             CMD smbclient -L \\localhost -U % -m SMB3
 
 VOLUME ["/etc", "/var/cache/samba", "/var/lib/samba", "/var/log/samba",\
-            "/run/samba"]
+        "/run/samba"]
 
-ENTRYPOINT ["/sbin/tini", "--", "/usr/bin/samba.sh"]
+ENTRYPOINT ["/usr/bin/tini", "--", "/usr/bin/samba.sh"]

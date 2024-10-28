@@ -16,18 +16,19 @@
 #      REVISION: 1.0
 #===============================================================================
 
-set -o nounset                              # Treat unset variables as an error
+set -o nounset  # Treat unset variables as an error
 
 ### charmap: setup character mapping for file/directory names
 # Arguments:
 #   chars) from:to character mappings separated by ','
-# Return: configured character mapings
-charmap() { local chars="$1" file=/etc/samba/smb.conf
+# Return: configured character mappings
+charmap() { 
+    local chars="$1" 
+    local file=/etc/samba/smb.conf
     grep -q catia $file || sed -i '/TCP_NODELAY/a \
 \
     vfs objects = catia\
     catia:mappings =\
-
                 ' $file
 
     sed -i '/catia:mappings/s| =.*| = '"$chars"'|' $file
@@ -38,11 +39,14 @@ charmap() { local chars="$1" file=/etc/samba/smb.conf
 #   section) section of config file
 #   option) raw option
 # Return: line added to smb.conf (replaces existing line with same key)
-generic() { local section="$1" key="$(sed 's| *=.*||' <<< $2)" \
-            value="$(sed 's|[^=]*= *||' <<< $2)" file=/etc/samba/smb.conf
+generic() { 
+    local section="$1" 
+    local key="$(sed 's| *=.*||' <<< $2)" 
+    local value="$(sed 's|[^=]*= *||' <<< $2)" 
+    local file=/etc/samba/smb.conf
     if sed -n '/^\['"$section"'\]/,/^\[/p' $file | grep -qE '^;*\s*'"$key"; then
         sed -i '/^\['"$1"'\]/,/^\[/s|^;*\s*\('"$key"' = \).*|   \1'"$value"'|' \
-                    "$file"
+            "$file"
     else
         sed -i '/\['"$section"'\]/a \   '"$key = $value" "$file"
     fi
@@ -52,11 +56,13 @@ generic() { local section="$1" key="$(sed 's| *=.*||' <<< $2)" \
 # Arguments:
 #   option) raw option
 # Return: line added to smb.conf (replaces existing line with same key)
-global() { local key="$(sed 's| *=.*||' <<< $1)" \
-            value="$(sed 's|[^=]*= *||' <<< $1)" file=/etc/samba/smb.conf
+global() { 
+    local key="$(sed 's| *=.*||' <<< $1)" 
+    local value="$(sed 's|[^=]*= *||' <<< $1)" 
+    local file=/etc/samba/smb.conf
     if sed -n '/^\[global\]/,/^\[/p' $file | grep -qE '^;*\s*'"$key"; then
         sed -i '/^\[global\]/,/^\[/s|^;*\s*\('"$key"' = \).*|   \1'"$value"'|' \
-                    "$file"
+            "$file"
     else
         sed -i '/\[global\]/a \   '"$key = $value" "$file"
     fi
@@ -65,7 +71,9 @@ global() { local key="$(sed 's| *=.*||' <<< $1)" \
 ### include: add a samba config file include
 # Arguments:
 #   file) file to import
-include() { local includefile="$1" file=/etc/samba/smb.conf
+include() { 
+    local includefile="$1" 
+    local file=/etc/samba/smb.conf
     sed -i "\\|include = $includefile|d" "$file"
     echo "include = $includefile" >> "$file"
 }
@@ -74,9 +82,12 @@ include() { local includefile="$1" file=/etc/samba/smb.conf
 # Arguments:
 #   file) file to import
 # Return: user(s) added to container
-import() { local file="$1" name id
+import() { 
+    local file="$1" 
+    local name 
+    local id
     while read name id; do
-        grep -q "^$name:" /etc/passwd || adduser -D -H -u "$id" "$name"
+        grep -q "^$name:" /etc/passwd || useradd -m -u "$id" "$name"
     done < <(cut -d: -f1,2 $file | sed 's/:/ /')
     pdbedit -i smbpasswd:$file
 }
@@ -85,11 +96,13 @@ import() { local file="$1" name id
 # Arguments:
 #   none)
 # Return: result
-perms() { local i file=/etc/samba/smb.conf
+perms() { 
+    local i 
+    local file=/etc/samba/smb.conf
     for i in $(awk -F ' = ' '/   path = / {print $2}' $file); do
-        chown -Rh smbuser. $i
-        find $i -type d ! -perm 775 -exec chmod 775 {} \;
-        find $i -type f ! -perm 0664 -exec chmod 0664 {} \;
+        chown -Rh smbuser:smb "$i"
+        find "$i" -type d ! -perm 775 -exec chmod 775 {} \;
+        find "$i" -type f ! -perm 0664 -exec chmod 0664 {} \;
     done
 }
 export -f perms
@@ -98,7 +111,8 @@ export -f perms
 # Arguments:
 #   none)
 # Return: result
-recycle() { local file=/etc/samba/smb.conf
+recycle() { 
+    local file=/etc/samba/smb.conf
     sed -i '/recycle:/d; /vfs objects/s/ recycle / /' $file
 }
 
@@ -114,9 +128,17 @@ recycle() { local file=/etc/samba/smb.conf
 #   writelist) list of users that can write to a RO share
 #   comment) description of share
 # Return: result
-share() { local share="$1" path="$2" browsable="${3:-yes}" ro="${4:-yes}" \
-                guest="${5:-yes}" users="${6:-""}" admins="${7:-""}" \
-                writelist="${8:-""}" comment="${9:-""}" file=/etc/samba/smb.conf
+share() { 
+    local share="$1" 
+    local path="$2" 
+    local browsable="${3:-yes}" 
+    local ro="${4:-yes}" 
+    local guest="${5:-yes}" 
+    local users="${6:-""}" 
+    local admins="${7:-""}" 
+    local writelist="${8:-""}" 
+    local comment="${9:-""}" 
+    local file=/etc/samba/smb.conf
     sed -i "/\\[$share\\]/,/^\$/d" $file
     echo "[$share]" >>$file
     echo "   path = $path" >>$file
@@ -138,14 +160,15 @@ share() { local share="$1" path="$2" browsable="${3:-yes}" ro="${4:-yes}" \
     [[ ${comment:-""} && ! ${comment:-""} =~ none ]] &&
         echo "   comment = $(tr ',' ' ' <<< $comment)" >>$file
     echo "" >>$file
-    [[ -d $path ]] || mkdir -p $path
+    [[ -d $path ]] || mkdir -p "$path"
 }
 
 ### smb: disable SMB2 minimum
 # Arguments:
 #   none)
 # Return: result
-smb() { local file=/etc/samba/smb.conf
+smb() { 
+    local file=/etc/samba/smb.conf
     sed -i 's/\([^#]*min protocol *=\).*/\1 LANMAN1/' $file
 }
 
@@ -157,12 +180,16 @@ smb() { local file=/etc/samba/smb.conf
 #   group) for user
 #   gid) for group
 # Return: user added to container
-user() { local name="$1" passwd="$2" id="${3:-""}" group="${4:-""}" \
-                gid="${5:-""}"
+user() { 
+    local name="$1" 
+    local passwd="$2" 
+    local id="${3:-""}" 
+    local group="${4:-""}" 
+    local gid="${5:-""}"
     [[ "$group" ]] && { grep -q "^$group:" /etc/group ||
-                addgroup ${gid:+--gid $gid }"$group"; }
+                groupadd ${gid:+--gid $gid }"$group"; }
     grep -q "^$name:" /etc/passwd ||
-        adduser -D -H ${group:+-G $group} ${id:+-u $id} "$name"
+        useradd -m ${group:+-g $group} ${id:+-u $id} "$name"
     echo -e "$passwd\n$passwd" | smbpasswd -s -a "$name"
 }
 
@@ -170,7 +197,9 @@ user() { local name="$1" passwd="$2" id="${3:-""}" group="${4:-""}" \
 # Arguments:
 #   workgroup) the name to set
 # Return: configure the correct workgroup
-workgroup() { local workgroup="$1" file=/etc/samba/smb.conf
+workgroup() { 
+    local workgroup="$1" 
+    local file=/etc/samba/smb.conf
     sed -i 's|^\( *workgroup = \).*|\1'"$workgroup"'|' $file
 }
 
@@ -178,8 +207,9 @@ workgroup() { local workgroup="$1" file=/etc/samba/smb.conf
 # Arguments:
 #   none)
 # Return: result
-widelinks() { local file=/etc/samba/smb.conf \
-            replace='\1\n   wide links = yes\n   unix extensions = no'
+widelinks() { 
+    local file=/etc/samba/smb.conf 
+    local replace='\1\n   wide links = yes\n   unix extensions = no'
     sed -i 's/\(follow symlinks = yes\)/'"$replace"'/' $file
 }
 
@@ -187,7 +217,8 @@ widelinks() { local file=/etc/samba/smb.conf \
 # Arguments:
 #   none)
 # Return: Help text
-usage() { local RC="${1:-0}"
+usage() { 
+    local RC="${1:-0}"
     echo "Usage: ${0##*/} [-opt] [command]
 Options (fields in '[]' are optional, '<>' are required):
     -h          This help
